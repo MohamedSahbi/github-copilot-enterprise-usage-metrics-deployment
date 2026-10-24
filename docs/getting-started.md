@@ -47,6 +47,10 @@ The portal repository's decision record (§12.4) is the source of truth for thes
 2. Run **Deploy** with `environment: dev` and `apply: false`, and read the plan.
 3. Run it again with `apply: true`.
 
+Notes:
+- The apply job has a 120 minute limit. Some Azure changes are slow; switching `sql_database_sku` between provisioned and serverless after the first deploy can take a long time, so choose the SKU before the first deploy.
+- If an apply is cancelled, it leaves the Terraform state locked. Break the lease on the state blob (`az storage blob lease break`) or run `terraform force-unlock`, then plan again.
+
 ## Network
 
 `dev` can use `network.mode = "create"`. For `test` and `prod`, the recommended mode is `existing`: pass the IDs of subnets and DNS zones that your network team already owns. Terraform reads them and never changes them.

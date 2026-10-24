@@ -51,6 +51,8 @@ stages:
         jobs:
           # Add approvals and checks on the Azure DevOps environment (Pipelines > Environments), especially for prod.
           - deployment: Apply
+            # Slow Azure operations (for example a SQL tier change) can exceed the 60 minute default.
+            timeoutInMinutes: 120
             environment: ${{ parameters.environment }}
             strategy:
               runOnce:
