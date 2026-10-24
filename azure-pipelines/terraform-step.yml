@@ -1,0 +1,25 @@
+# One Terraform step (init, validate, plan or apply) run through the portal's scripts/deploy-infra.sh with OIDC.
+parameters:
+  - name: step
+    type: string
+  - name: environment
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: Terraform ${{ parameters.step }} (${{ parameters.environment }})
+    inputs:
+      azureSubscription: $(azureServiceConnection)
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -euo pipefail
+        export ARM_USE_OIDC=true
+        export ARM_USE_AZUREAD_AUTH=true
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_OIDC_TOKEN="$idToken"
+        # The service connection selects the subscription; if its identity sees several, the connection's own subscription is used.
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+        portal/scripts/deploy-infra.sh "${{ parameters.step }}" "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"

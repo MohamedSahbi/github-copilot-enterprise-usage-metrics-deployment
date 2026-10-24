@@ -10,7 +10,7 @@ parameters:
     default: dev
     values: [dev, test, prod]
   - name: apply
-    displayName: Apply the plan (otherwise plan only)
+    displayName: Apply the reviewed plan after approval (otherwise plan only)
     type: boolean
     default: false
 
@@ -27,61 +27,39 @@ pool:
   vmImage: ubuntu-latest
 
 stages:
-  - stage: Deploy
-    displayName: Deploy ${{ parameters.environment }}
+  - stage: Plan
+    displayName: Plan ${{ parameters.environment }}
     jobs:
-      # Add approvals and checks on the Azure DevOps environment (Pipelines > Environments), especially for prod.
-      - deployment: Infra
-        environment: ${{ parameters.environment }}
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
+      - job: Plan
+        steps:
+          - template: azure-pipelines/prepare.yml
+          - template: azure-pipelines/terraform-step.yml
+            parameters: { step: init, environment: '${{ parameters.environment }}' }
+          - template: azure-pipelines/terraform-step.yml
+            parameters: { step: validate, environment: '${{ parameters.environment }}' }
+          - template: azure-pipelines/terraform-step.yml
+            parameters: { step: plan, environment: '${{ parameters.environment }}' }
+          # The plan file can contain sensitive values: restrict who can read this pipeline's artifacts.
+          - publish: portal/infra/terraform/stack/${{ parameters.environment }}.tfplan
+            artifact: tfplan-${{ parameters.environment }}
+            displayName: Publish the plan for review and apply
 
-                - bash: |
-                    set -euo pipefail
-                    repository="$(yq '.portal.repository' config/deployment.yml)"
-                    version="$(yq '.portal.version' config/deployment.yml)"
-                    if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-                      echo "##vso[task.logissue type=error]portal.repository in config/deployment.yml must be owner/name"; exit 1
-                    fi
-                    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$version" == "0.0.0" ]]; then
-                      echo "##vso[task.logissue type=error]Set portal.version in config/deployment.yml to a released portal version"; exit 1
-                    fi
-                    git clone --quiet --depth 1 --branch "v$version" "https://github.com/$repository.git" portal
-                  displayName: Fetch the pinned portal release
-
-                - bash: |
-                    set -euo pipefail
-                    v="$(terraformVersion)"
-                    base="https://releases.hashicorp.com/terraform/${v}"
-                    zip="terraform_${v}_linux_amd64.zip"
-                    cd "$(Agent.TempDirectory)"
-                    curl -fsSLO "${base}/${zip}"
-                    curl -fsSLO "${base}/terraform_${v}_SHA256SUMS"
-                    grep " ${zip}\$" "terraform_${v}_SHA256SUMS" | sha256sum -c -
-                    unzip -q -o "${zip}" terraform
-                    sudo install -m 0755 terraform /usr/local/bin/terraform
-                    terraform version
-                  displayName: Install Terraform
-
-                - task: AzureCLI@2
-                  displayName: Terraform ${{ parameters.environment }}
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    addSpnToEnvironment: true
-                    inlineScript: |
-                      set -euo pipefail
-                      export ARM_USE_OIDC=true
-                      export ARM_USE_AZUREAD_AUTH=true
-                      export ARM_CLIENT_ID="$servicePrincipalId"
-                      export ARM_TENANT_ID="$tenantId"
-                      export ARM_OIDC_TOKEN="$idToken"
-                      # The service connection selects the subscription; if its identity sees several, the connection's own subscription is used.
-                      export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
-                      args=("${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars")
-                      if [[ "${{ parameters.apply }}" == "True" ]]; then args+=(--apply); fi
-                      portal/scripts/deploy-infra.sh "${args[@]}"
+  - ${{ if eq(parameters.apply, true) }}:
+      - stage: Apply
+        displayName: Apply ${{ parameters.environment }}
+        dependsOn: Plan
+        jobs:
+          # Add approvals and checks on the Azure DevOps environment (Pipelines > Environments), especially for prod.
+          - deployment: Apply
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: azure-pipelines/prepare.yml
+                    - bash: cp "$(Pipeline.Workspace)/tfplan-${{ parameters.environment }}/${{ parameters.environment }}.tfplan" portal/infra/terraform/stack/
+                      displayName: Place the reviewed plan
+                    - template: azure-pipelines/terraform-step.yml
+                      parameters: { step: init, environment: '${{ parameters.environment }}' }
+                    - template: azure-pipelines/terraform-step.yml
+                      parameters: { step: apply, environment: '${{ parameters.environment }}' }
