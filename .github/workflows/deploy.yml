@@ -68,7 +68,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Init
-        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        working-directory: portal/infra/terraform/stack
         run: |
           terraform init -input=false \
             -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
@@ -77,10 +77,10 @@ jobs:
             -backend-config="key=${{ inputs.environment }}.tfstate"
 
       - name: Plan
-        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        working-directory: portal/infra/terraform/stack
         run: terraform plan -input=false -var-file="$GITHUB_WORKSPACE/config/${{ inputs.environment }}.tfvars" -out=tfplan
 
       - name: Apply
         if: inputs.apply
-        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        working-directory: portal/infra/terraform/stack
         run: terraform apply -input=false tfplan

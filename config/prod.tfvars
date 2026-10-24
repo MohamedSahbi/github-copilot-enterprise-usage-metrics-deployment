@@ -1,4 +1,5 @@
 # Non-secret configuration for the prod environment. Replace the values marked REPLACE.
+environment = "prod"
 location    = "westeurope" # REPLACE with your Azure region
 name_prefix = "cmp"        # REPLACE: 2-12 lowercase letters or digits
 

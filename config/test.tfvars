@@ -1,4 +1,5 @@
 # Non-secret configuration for the test environment. Replace the values marked REPLACE.
+environment = "test"
 location    = "westeurope" # REPLACE with your Azure region
 name_prefix = "cmp"        # REPLACE: 2-12 lowercase letters or digits
 

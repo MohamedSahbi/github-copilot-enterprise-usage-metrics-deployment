@@ -1,5 +1,6 @@
 # Non-secret configuration for the dev environment. Replace the values marked REPLACE.
 # Secrets never go here; they live in Key Vault (see docs/getting-started.md).
+environment = "dev"
 location    = "westeurope" # REPLACE with your Azure region
 name_prefix = "cmp"        # REPLACE: 2-12 lowercase letters or digits
 
