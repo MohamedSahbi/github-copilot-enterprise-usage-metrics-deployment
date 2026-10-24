@@ -4,11 +4,19 @@ Everything below is one-time setup per subscription. Terraform state and deploys
 
 ## 1. Azure
 
-1. **State storage.** Create a resource group and a storage account with a container named `tfstate` (versioning on, public access off). Note the resource group and account names.
+1. **State storage.** Run the portal's `scripts/bootstrap-state.sh <resource-group> <storage-account> <location> [principal-object-id]` once (Azure CLI, signed in to the subscription). It creates the account with a `tfstate` container, versioning on and public access off. Note the resource group and account names.
 2. **Deployment identity.** Create an app registration (or a user-assigned managed identity) for deployments. Add a **federated credential** per environment: issuer `https://token.actions.githubusercontent.com`, subject `repo:<your-org>/<this-repo>:environment:<dev|test|prod>`.
 3. **Permissions.** Grant that identity Contributor on the environment's subscription or resource group, and Storage Blob Data Contributor on the state storage account.
 
-## 2. GitHub environments
+## 2. Pipeline
+
+Choose one wrapper; both call the portal's `scripts/deploy-infra.sh`.
+
+**Azure Pipelines** (`azure-pipelines.yml`): create an Azure Resource Manager service connection with **workload identity federation** and put its name, plus the state resource group and account, in the `variables` block of the file (marked REPLACE). Create Azure DevOps environments `dev`, `test`, `prod` and add approvals on `prod`. Run the pipeline manually and pick the environment; leave `apply` off for a plan first.
+
+**GitHub Actions** (`.github/workflows/deploy.yml`): follow the next section.
+
+## 3. GitHub environments (GitHub Actions only)
 
 Create environments `dev`, `test`, and `prod` in this repository. Require reviewers on `prod`. On each environment set these **variables** (not secrets):
 
@@ -20,7 +28,7 @@ Create environments `dev`, `test`, and `prod` in this repository. Require review
 | `TFSTATE_RESOURCE_GROUP` | State resource group |
 | `TFSTATE_STORAGE_ACCOUNT` | State storage account |
 
-## 3. Portal credentials
+## 4. Portal credentials
 
 The portal uses separate credentials, each used by one component. Store them in Key Vault after the first deployment creates the vault; never in this repository.
 

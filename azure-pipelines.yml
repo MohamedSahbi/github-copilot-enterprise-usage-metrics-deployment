@@ -1,0 +1,70 @@
+# Azure Pipelines wrapper. All logic lives in the portal's scripts/deploy-infra.sh; this file only prepares inputs.
+# Run it manually (no CI trigger). Settings to replace are marked REPLACE.
+trigger: none
+pr: none
+
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values: [dev, test, prod]
+  - name: apply
+    displayName: Apply the plan (otherwise plan only)
+    type: boolean
+    default: false
+
+variables:
+  # Azure DevOps service connection of type "Azure Resource Manager" using workload identity federation (no secret).
+  azureServiceConnection: REPLACE-service-connection-name
+  # Output of the portal's scripts/bootstrap-state.sh.
+  TFSTATE_RESOURCE_GROUP: REPLACE-state-resource-group
+  TFSTATE_STORAGE_ACCOUNT: REPLACE-state-storage-account
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Deploy
+    displayName: Deploy ${{ parameters.environment }}
+    jobs:
+      # Add approvals and checks on the Azure DevOps environment (Pipelines > Environments), especially for prod.
+      - deployment: Infra
+        environment: ${{ parameters.environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - bash: |
+                    set -euo pipefail
+                    repository="$(yq '.portal.repository' config/deployment.yml)"
+                    version="$(yq '.portal.version' config/deployment.yml)"
+                    if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+                      echo "##vso[task.logissue type=error]portal.repository in config/deployment.yml must be owner/name"; exit 1
+                    fi
+                    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$version" == "0.0.0" ]]; then
+                      echo "##vso[task.logissue type=error]Set portal.version in config/deployment.yml to a released portal version"; exit 1
+                    fi
+                    git clone --quiet --depth 1 --branch "v$version" "https://github.com/$repository.git" portal
+                  displayName: Fetch the pinned portal release
+
+                - task: AzureCLI@2
+                  displayName: Terraform ${{ parameters.environment }}
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    addSpnToEnvironment: true
+                    inlineScript: |
+                      set -euo pipefail
+                      export ARM_USE_OIDC=true
+                      export ARM_USE_AZUREAD_AUTH=true
+                      export ARM_CLIENT_ID="$servicePrincipalId"
+                      export ARM_TENANT_ID="$tenantId"
+                      export ARM_OIDC_TOKEN="$idToken"
+                      export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+                      args=("${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars")
+                      if [[ "${{ parameters.apply }}" == "True" ]]; then args+=(--apply); fi
+                      portal/scripts/deploy-infra.sh "${args[@]}"

@@ -18,7 +18,8 @@ this repository pins a released version of it and deploys it to your Azure subsc
 | --- | --- |
 | `config/deployment.yml` | Settings the pipeline reads: which portal repository and release to deploy. |
 | `config/*.tfvars` | Settings Terraform and the portal read, per environment: organization facts, region, optional modules, network mode, alert emails. |
-| `.github/workflows/deploy.yml` | Checks out the pinned portal release and runs Terraform with your settings. |
+| `azure-pipelines.yml` | Azure Pipelines wrapper: fetches the pinned portal release and runs its deploy script. |
+| `.github/workflows/deploy.yml` | The same for GitHub Actions. |
 | `docs/` | Setup guide and the deployment-note template. |
 
 ## Updating
