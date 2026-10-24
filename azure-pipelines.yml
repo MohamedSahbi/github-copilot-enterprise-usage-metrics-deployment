@@ -20,6 +20,8 @@ variables:
   # Output of the portal's scripts/bootstrap-state.sh.
   TFSTATE_RESOURCE_GROUP: REPLACE-state-resource-group
   TFSTATE_STORAGE_ACCOUNT: REPLACE-state-storage-account
+  # Microsoft-hosted agents do not ship Terraform. The portal needs 1.11 or newer.
+  terraformVersion: 1.17.0
 
 pool:
   vmImage: ubuntu-latest
@@ -50,6 +52,20 @@ stages:
                     git clone --quiet --depth 1 --branch "v$version" "https://github.com/$repository.git" portal
                   displayName: Fetch the pinned portal release
 
+                - bash: |
+                    set -euo pipefail
+                    v="$(terraformVersion)"
+                    base="https://releases.hashicorp.com/terraform/${v}"
+                    zip="terraform_${v}_linux_amd64.zip"
+                    cd "$(Agent.TempDirectory)"
+                    curl -fsSLO "${base}/${zip}"
+                    curl -fsSLO "${base}/terraform_${v}_SHA256SUMS"
+                    grep " ${zip}\$" "terraform_${v}_SHA256SUMS" | sha256sum -c -
+                    unzip -q -o "${zip}" terraform
+                    sudo install -m 0755 terraform /usr/local/bin/terraform
+                    terraform version
+                  displayName: Install Terraform
+
                 - task: AzureCLI@2
                   displayName: Terraform ${{ parameters.environment }}
                   inputs:
@@ -64,6 +80,7 @@ stages:
                       export ARM_CLIENT_ID="$servicePrincipalId"
                       export ARM_TENANT_ID="$tenantId"
                       export ARM_OIDC_TOKEN="$idToken"
+                      # The service connection selects the subscription; if its identity sees several, the connection's own subscription is used.
                       export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
                       args=("${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars")
                       if [[ "${{ parameters.apply }}" == "True" ]]; then args+=(--apply); fi
