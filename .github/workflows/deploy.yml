@@ -1,0 +1,84 @@
+name: Deploy
+
+# Plans, and optionally applies, the portal infrastructure for one environment using the
+# portal release named in portal-version and the configuration in config/<environment>.tfvars.
+# Not yet exercised against a real Azure subscription; the first deployment validates it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        type: choice
+        options: [dev, test, prod]
+        required: true
+      apply:
+        description: Apply after planning (prod waits for environment approval)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  # Change only if you consume a fork of the portal.
+  PORTAL_REPO: MohamedSahbi/github-copilot-enterprise-usage-metrics
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      # OIDC: no stored secrets. Set these as variables on each GitHub environment (docs/getting-started.md).
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD_AUTH: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read portal version
+        id: version
+        run: |
+          version="$(tr -d '[:space:]' < portal-version)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$version" == "0.0.0" ]]; then
+            echo "::error::Set portal-version to a released portal version, for example 0.1.0"
+            exit 1
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the portal release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.PORTAL_REPO }}
+          ref: ${{ steps.version.outputs.tag }}
+          path: portal
+          submodules: recursive
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+
+      - name: Init
+        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=${{ inputs.environment }}.tfstate"
+
+      - name: Plan
+        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        run: terraform plan -input=false -var-file="$GITHUB_WORKSPACE/config/${{ inputs.environment }}.tfvars" -out=tfplan
+
+      - name: Apply
+        if: inputs.apply
+        working-directory: portal/infra/terraform/environments/${{ inputs.environment }}
+        run: terraform apply -input=false tfplan
