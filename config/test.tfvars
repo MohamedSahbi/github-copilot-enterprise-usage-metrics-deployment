@@ -7,7 +7,7 @@ organization = {
   enterprise_slug    = "REPLACE-enterprise-slug"
   organizations      = ["REPLACE-org"]
   login_suffix       = "_REPLACE"                             # suffix of managed-user logins
-  group_prefix       = "REPLACE-"                             # prefix of business-area groups; "" if none
+  group_prefix       = "REPLACE-"                             # Entra group display-name prefix for business areas; "" = no group scoping
   directory_provider = "entra"                                # entra or csv
   entra_tenant_id    = "00000000-0000-0000-0000-000000000000" # REPLACE
 }
@@ -17,6 +17,19 @@ modules = {
   budget_lookup = false
   feedback      = true
 }
+
+# Optional: deploy into a pre-existing resource group (the deploy identity needs Contributor and User Access Administrator on it).
+# existing_resource_group_name = "REPLACE-rg"
+
+# Required unless existing_sql is set. An Entra user, group or managed identity you pass in (Terraform creates nothing).
+# object_id is the principal (object) ID. Azure SQL allows one admin; use a group to have several.
+# sql_admin = {
+#   login_username = "REPLACE-name"
+#   object_id      = "00000000-0000-0000-0000-000000000000"
+# }
+
+# App Service plan SKU (default B1).
+# app_service_sku = "B1"
 
 alert_emails = ["team@example.com"] # REPLACE with a team mailbox or distribution list
 

@@ -6,13 +6,14 @@ Everything below is one-time setup per subscription. Terraform state and deploys
 
 1. **State storage.** Run the portal's `scripts/bootstrap-state.sh <resource-group> <storage-account> <location> [principal-object-id]` once (Azure CLI, signed in to the subscription). It creates the account with a `tfstate` container, versioning on and public access off. Note the resource group and account names.
 2. **Deployment identity.** Create an app registration (or a user-assigned managed identity) for deployments. Add a **federated credential** per environment: issuer `https://token.actions.githubusercontent.com`, subject `repo:<your-org>/<this-repo>:environment:<dev|test|prod>`.
-3. **Permissions.** Grant that identity Contributor on the environment's subscription or resource group, and Storage Blob Data Contributor on the state storage account.
+3. **Permissions.** Grant that identity **Contributor and User Access Administrator** on the environment's subscription or resource group (the stack creates role assignments), and Storage Blob Data Contributor on the state storage account.
+4. **Existing resource group.** To deploy into one, set `existing_resource_group_name` in the tfvars. The state storage can live in the same group: pass it to `bootstrap-state.sh`.
 
 ## 2. Pipeline
 
 Choose one wrapper; both call the portal's `scripts/deploy-infra.sh`.
 
-**Azure Pipelines** (`azure-pipelines.yml`): create an Azure Resource Manager service connection with **workload identity federation** and put its name, plus the state resource group and account, in the `variables` block of the file (marked REPLACE). Create Azure DevOps environments `dev`, `test`, `prod` and add approvals on `prod`. Run the pipeline manually and pick the environment; leave `apply` off for a plan first.
+**Azure Pipelines** (`azure-pipelines.yml`): create an Azure Resource Manager service connection with **workload identity federation** and put its name, plus the state resource group and account, in the `variables` block of the file (marked REPLACE). The service connection identity needs the same role assignments as step 3. Create Azure DevOps environments named exactly `dev`, `test` and `prod` (Pipelines > Environments) before the first run, and add approvals on `prod`. Run the pipeline manually and pick the environment; leave `apply` off for a plan first.
 
 **GitHub Actions** (`.github/workflows/deploy.yml`): follow the next section.
 
@@ -40,7 +41,7 @@ The portal uses separate credentials, each used by one component. Store them in 
 
 The portal repository's decision record (§12.4) is the source of truth for these.
 
-## 4. First deploy
+## 5. First deploy
 
 1. Set `portal.version` in `config/deployment.yml` to a released portal version.
 2. Run **Deploy** with `environment: dev` and `apply: false`, and read the plan.
