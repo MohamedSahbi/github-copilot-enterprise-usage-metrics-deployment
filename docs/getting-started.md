@@ -34,7 +34,7 @@ The portal repository's decision record (§12.4) is the source of truth for thes
 
 ## 4. First deploy
 
-1. Set `portal-version` to a released portal version.
+1. Set `portal.version` in `config/deployment.yml` to a released portal version.
 2. Run **Deploy** with `environment: dev` and `apply: false`, and read the plan.
 3. Run it again with `apply: true`.
 

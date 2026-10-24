@@ -1,7 +1,7 @@
 name: Deploy
 
 # Plans, and optionally applies, the portal infrastructure for one environment using the
-# portal release named in portal-version and the configuration in config/<environment>.tfvars.
+# portal release named in config/deployment.yml and the configuration in config/<environment>.tfvars.
 # Not yet exercised against a real Azure subscription; the first deployment validates it.
 
 on:
@@ -25,10 +25,6 @@ concurrency:
   group: deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
-env:
-  # Change only if you consume a fork of the portal.
-  PORTAL_REPO: MohamedSahbi/github-copilot-enterprise-usage-metrics
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -43,21 +39,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Read portal version
-        id: version
+      - name: Read portal settings
+        id: portal
         run: |
-          version="$(tr -d '[:space:]' < portal-version)"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$version" == "0.0.0" ]]; then
-            echo "::error::Set portal-version to a released portal version, for example 0.1.0"
+          repository="$(yq '.portal.repository' config/deployment.yml)"
+          version="$(yq '.portal.version' config/deployment.yml)"
+          if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "::error::portal.repository in config/deployment.yml must be owner/name"
             exit 1
           fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$version" == "0.0.0" ]]; then
+            echo "::error::Set portal.version in config/deployment.yml to a released portal version, for example 0.1.0"
+            exit 1
+          fi
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       - name: Check out the portal release
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ env.PORTAL_REPO }}
-          ref: ${{ steps.version.outputs.tag }}
+          repository: ${{ steps.portal.outputs.repository }}
+          ref: ${{ steps.portal.outputs.tag }}
           path: portal
           submodules: recursive
 

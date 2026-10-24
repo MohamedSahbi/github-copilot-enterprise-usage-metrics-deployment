@@ -1,19 +1,19 @@
 # Deployment note (private)
 
-Keep the filled-in version of this file in your **private** repository only. It records organization-specific facts that must never appear in the public portal repository.
+Human-only facts about your deployment. Keep the filled-in version in your **private** repository only.
+
+Anything a tool or the portal reads does not belong here:
+
+- Organization facts (enterprise slug, organizations, login suffix, group prefix, directory provider, tenant ID) live in `config/<environment>.tfvars`.
+- Which portal version to deploy lives in `config/deployment.yml`.
+- Secrets live in Key Vault, never in this repository.
 
 | Fact | Value |
 | --- | --- |
-| Enterprise slug | `{enterprise}` |
-| Organizations in scope | `{org}` |
-| Login suffix for managed users | `{login-suffix}` |
-| Group name prefix for business areas | `{group-prefix}` |
-| Entra tenant ID | |
-| Directory provider | Entra Graph or CSV import |
-| Portal admin principals | |
-| Alert recipients | |
+| Portal admins and how to reach them | |
+| Business owner of the deployment | |
+| Alert mailbox owner | |
 | Azure subscription per environment | dev: / test: / prod: |
-| GitHub PAT expiry date | |
-| GitHub App key rotation date | |
-
-Do not record secrets here.
+| GitHub classic PAT expiry date | |
+| GitHub App key last rotated | |
+| Decisions specific to this organization, and why | |

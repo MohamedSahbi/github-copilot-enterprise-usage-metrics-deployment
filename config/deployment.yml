@@ -1,0 +1,6 @@
+# Settings read by the deploy pipeline itself. Anything Terraform or the portal reads belongs in config/<environment>.tfvars.
+portal:
+  # Change the repository only if you consume your own fork of the portal.
+  repository: MohamedSahbi/github-copilot-enterprise-usage-metrics
+  # A released portal version, for example 0.1.0. The deploy workflow refuses 0.0.0.
+  version: 0.0.0

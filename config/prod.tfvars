@@ -2,6 +2,15 @@
 location    = "westeurope" # REPLACE with your Azure region
 name_prefix = "cmp"        # REPLACE: 2-12 lowercase letters or digits
 
+organization = {
+  enterprise_slug    = "REPLACE-enterprise-slug"
+  organizations      = ["REPLACE-org"]
+  login_suffix       = "_REPLACE"                             # suffix of managed-user logins
+  group_prefix       = "REPLACE-"                             # prefix of business-area groups; "" if none
+  directory_provider = "entra"                                # entra or csv
+  entra_tenant_id    = "00000000-0000-0000-0000-000000000000" # REPLACE
+}
+
 modules = {
   ai_credits    = false
   budget_lookup = false
