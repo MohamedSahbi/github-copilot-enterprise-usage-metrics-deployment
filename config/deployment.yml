@@ -2,5 +2,5 @@
 portal:
   # Change the repository only if you consume your own fork of the portal.
   repository: MohamedSahbi/github-copilot-enterprise-usage-metrics
-  # A released portal version, for example 0.1.0. Use 0.2.0 or later: earlier releases lack the deploy scripts.
-  version: 0.2.0
+  # A released portal version, for example 0.1.0. Use 0.2.3 or later: the pipelines call the step-based deploy script.
+  version: 0.2.3
