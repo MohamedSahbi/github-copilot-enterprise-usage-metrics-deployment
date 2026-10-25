@@ -28,6 +28,10 @@ Prerequisite: the pipeline agent needs outbound HTTPS access to `github.com` (se
 
 Change `portal.version` to a newer release tag and run the workflow. You never merge from the upstream project, and nothing here is a copy of portal code, so there are no conflicts to resolve. Changing portal behaviour means forking the portal repository and setting `portal.repository` in `config/deployment.yml` to your fork.
 
+## Taking template changes
+
+A repository created from this template shares no history with it. To take newer wrappers, documentation or configuration keys, review the template's changes and copy them over by hand in a reviewed pull request. Never overwrite your own `config/*` values. Portal upgrades are separate: change `portal.version`.
+
 ## Status
 
 Early. The infrastructure deployment has been run end to end for a `dev` environment through Azure Pipelines. The portal application itself is still under construction, so expect changes before the first 1.0 release. Pin an exact portal version and read its release notes before upgrading.
