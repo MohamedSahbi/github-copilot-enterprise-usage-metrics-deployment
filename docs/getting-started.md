@@ -51,6 +51,10 @@ Notes:
 - The apply job has a 120 minute limit. Some Azure changes are slow; switching `sql_database_sku` between provisioned and serverless after the first deploy can take a long time, so choose the SKU before the first deploy.
 - If an apply is cancelled, it leaves the Terraform state locked. Break the lease on the state blob (`az storage blob lease break`) or run `terraform force-unlock`, then plan again.
 
+## Outbound access for the pipeline
+
+The deploy agent must reach `github.com` over HTTPS (port 443) to clone the portal release (`MohamedSahbi/github-copilot-enterprise-usage-metrics`, or your fork). If your organization uses an outbound allowlist or proxy, add `github.com`. Building the portal application (not part of this template's deploy) also fetches the upstream submodule from `github.com`; the same allowlist entry covers it.
+
 ## Network
 
 `dev` can use `network.mode = "create"`. For `test` and `prod`, the recommended mode is `existing`: pass the IDs of subnets and DNS zones that your network team already owns. Terraform reads them and never changes them.
