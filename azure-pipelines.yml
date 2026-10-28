@@ -13,6 +13,10 @@ parameters:
     displayName: Apply the reviewed plan after approval (otherwise plan only)
     type: boolean
     default: false
+  - name: deployPortal
+    displayName: Deploy the portal code after the apply (needs apply)
+    type: boolean
+    default: false
 
 variables:
   # Azure DevOps service connection of type "Azure Resource Manager" using workload identity federation (no secret).
@@ -65,3 +69,20 @@ stages:
                       parameters: { step: init, environment: '${{ parameters.environment }}' }
                     - template: azure-pipelines/terraform-step.yml
                       parameters: { step: apply, environment: '${{ parameters.environment }}' }
+
+  - ${{ if and(eq(parameters.apply, true), eq(parameters.deployPortal, true)) }}:
+      - stage: DeployPortal
+        displayName: Deploy portal ${{ parameters.environment }}
+        dependsOn: Apply
+        jobs:
+          # Runs only after a successful apply; the environment's approvals and checks apply again.
+          - deployment: DeployPortal
+            timeoutInMinutes: 60
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: azure-pipelines/prepare.yml
+                    - template: azure-pipelines/deploy-portal-step.yml
+                      parameters: { environment: '${{ parameters.environment }}' }
