@@ -1,0 +1,33 @@
+# Migrates the environment's database and maps the runtime identities to their SQL roles through the portal's scripts/deploy-db.sh.
+# The service connection's identity must be a member of the SQL server's Entra admin group. Nothing environment-specific is configured here.
+parameters:
+  - name: environment
+    type: string
+
+steps:
+  - task: UseNode@1
+    displayName: Use Node.js 22
+    inputs:
+      version: 22.x
+
+  - task: AzureCLI@2
+    displayName: Migrate database and map runtime users (${{ parameters.environment }})
+    inputs:
+      azureSubscription: $(azureServiceConnection)
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -euo pipefail
+        if [[ ! -x portal/scripts/deploy-db.sh ]]; then
+          echo "##vso[task.logissue type=warning]portal.version predates scripts/deploy-db.sh; database step skipped"
+          exit 0
+        fi
+        export ARM_USE_OIDC=true
+        export ARM_USE_AZUREAD_AUTH=true
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_OIDC_TOKEN="$idToken"
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+        portal/scripts/deploy-infra.sh init "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"
+        portal/scripts/deploy-db.sh

@@ -46,7 +46,8 @@ The portal repository's decision record (§12.4) is the source of truth for thes
 1. Set `portal.version` in `config/deployment.yml` to a released portal version.
 2. Run **Deploy** with `environment: dev` and `apply: false`, and read the plan.
 3. Run it again with `apply: true`.
-4. Once the database is migrated and access is bootstrapped, run it with `apply: true` and `deployPortal: true` (Azure Pipelines) to build the pinned release and deploy the portal code to the web app. It needs a portal release that includes `scripts/deploy-portal.sh`, and an agent that can reach the web app's deployment endpoint (public network access enabled, or a self-hosted agent with a private route).
+4. Every apply is followed by a **Database** stage (Azure Pipelines): it runs the pinned release's `scripts/deploy-db.sh`, which applies migrations and maps the runtime identities to their SQL roles. Re-running is safe. The service connection's identity must be in the SQL server's Entra admin group; a release without `scripts/deploy-db.sh` skips the stage with a warning.
+5. Once access is bootstrapped, run it with `apply: true` and `deployPortal: true` to build the pinned release and deploy the portal code to the web app, and `deployFunctions: true` to deploy the metrics and directory Function Apps. They need a portal release that includes `scripts/deploy-portal.sh` and `scripts/deploy-functions.sh`, and an agent that can reach the apps' deployment endpoints (public network access enabled, or a self-hosted agent with a private route).
 
 Notes:
 - The apply job has a 120 minute limit. Some Azure changes are slow; switching `sql_database_sku` between provisioned and serverless after the first deploy can take a long time, so choose the SKU before the first deploy.
