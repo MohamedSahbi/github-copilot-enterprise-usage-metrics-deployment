@@ -1,0 +1,39 @@
+# Builds the pinned release's ingestion artifacts and zip-deploys them to the environment's metrics and directory Function Apps through the portal's scripts/deploy-functions.sh.
+# The target names come from the Terraform outputs, so nothing environment-specific is configured here.
+parameters:
+  - name: environment
+    type: string
+
+steps:
+  - task: UseNode@1
+    displayName: Use Node.js 22
+    inputs:
+      version: 22.x
+
+  - task: AzureCLI@2
+    displayName: Deploy functions code (${{ parameters.environment }})
+    inputs:
+      azureSubscription: $(azureServiceConnection)
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -euo pipefail
+        [[ -x portal/scripts/deploy-functions.sh ]] || {
+          echo "##vso[task.logissue type=error]portal.version predates scripts/deploy-functions.sh; pin a release that includes it"; exit 1
+        }
+        export ARM_USE_OIDC=true
+        export ARM_USE_AZUREAD_AUTH=true
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_OIDC_TOKEN="$idToken"
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+        portal/scripts/deploy-infra.sh init "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"
+        stack=portal/infra/terraform/stack
+        resource_group="$(terraform -chdir="$stack" output -raw resource_group_name)"
+        metrics_app="$(terraform -chdir="$stack" output -raw ingestion_function_app_name)"
+        directory_app="$(terraform -chdir="$stack" output -raw directory_function_app_name)"
+        # init may add platform hashes to the lockfile; the deploy script requires the release checkout to be unmodified.
+        git -C portal checkout -- infra/terraform/stack/.terraform.lock.hcl
+        portal/scripts/deploy-functions.sh metrics "$resource_group" "$metrics_app"
+        portal/scripts/deploy-functions.sh directory "$resource_group" "$directory_app"
