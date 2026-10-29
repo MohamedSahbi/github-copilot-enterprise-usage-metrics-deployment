@@ -1,0 +1,60 @@
+# Azure Pipelines: data operations on an environment's portal database, separate from the deploy pipeline.
+# All logic lives in the portal's scripts/data-ops.sh. Nothing triggers it: queue it by hand and pick an operation.
+# Register it as its own pipeline. Settings to replace are marked REPLACE (the same values as azure-pipelines.yml).
+trigger: none
+pr: none
+
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values: [dev, test, prod]
+  - name: operation
+    displayName: Operation
+    type: string
+    default: status
+    values:
+      - status                    # read-only: metrics state of each day from fromDay to yesterday, synthetic run IDs
+      - remove-synthetic          # dry run: deletes in a transaction, prints the counts, rolls back
+      - remove-synthetic-execute  # deletes, only if the fact-row count still equals expectFactRows
+  - name: fromDay
+    displayName: First day for status (yyyy-mm-dd)
+    type: string
+    default: "2026-09-01"
+  - name: expectFactRows
+    displayName: Fact rows from the dry run (remove-synthetic-execute only)
+    type: string
+    default: "-"
+
+variables:
+  # Azure DevOps service connection of type "Azure Resource Manager" using workload identity federation (no secret).
+  # Its identity must be in the SQL server's Entra admin group.
+  azureServiceConnection: REPLACE-service-connection-name
+  # Output of the portal's scripts/bootstrap-state.sh.
+  TFSTATE_RESOURCE_GROUP: REPLACE-state-resource-group
+  TFSTATE_STORAGE_ACCOUNT: REPLACE-state-storage-account
+  # Microsoft-hosted agents do not ship Terraform. The portal needs 1.11 or newer.
+  terraformVersion: 1.17.0
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: DataOperation
+    displayName: ${{ parameters.operation }} (${{ parameters.environment }})
+    jobs:
+      # A deployment job, so the environment's approvals and checks apply, including to the delete.
+      - deployment: DataOperation
+        environment: ${{ parameters.environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: azure-pipelines/prepare.yml
+                - template: azure-pipelines/data-operation-step.yml
+                  parameters:
+                    environment: ${{ parameters.environment }}
+                    operation: ${{ parameters.operation }}
+                    fromDay: ${{ parameters.fromDay }}
+                    expectFactRows: ${{ parameters.expectFactRows }}
