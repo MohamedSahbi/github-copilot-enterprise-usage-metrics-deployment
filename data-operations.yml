@@ -1,8 +1,20 @@
 # Azure Pipelines: data operations on an environment's portal database, separate from the deploy pipeline.
-# All logic lives in the portal's scripts/data-ops.sh. Nothing triggers it: queue it by hand and pick an operation.
-# Register it as its own pipeline. Settings to replace are marked REPLACE (the same values as azure-pipelines.yml).
+# Nothing triggers it: queue it by hand and pick an operation. Register it as its own pipeline.
+# This file only points at the pipeline in the deployment template repository and sets your values; the stages, steps
+# and checks are loaded from there at run time, so a deployment repository never carries its own copy of them.
+# Settings to replace are marked REPLACE (the same values as azure-pipelines.yml, plus a GitHub service connection).
 trigger: none
 pr: none
+
+resources:
+  repositories:
+    - repository: template
+      type: github
+      # Azure DevOps service connection of type "GitHub" that can read the public template repository.
+      endpoint: REPLACE-github-service-connection-name
+      name: MohamedSahbi/github-copilot-enterprise-usage-metrics-deployment
+      # Follows the template's main branch. Pin a tag or commit (refs/tags/<tag>) to hold a reviewed version.
+      ref: refs/heads/main
 
 parameters:
   - name: environment
@@ -14,10 +26,7 @@ parameters:
     displayName: Operation
     type: string
     default: status
-    values:
-      - status                    # read-only: metrics state of each day from fromDay to yesterday, synthetic run IDs
-      - remove-synthetic          # dry run: deletes in a transaction, prints the counts, rolls back
-      - remove-synthetic-execute  # deletes, only if the fact-row count still equals expectFactRows
+    values: [status, remove-synthetic, remove-synthetic-execute]
   - name: fromDay
     displayName: First day for status (yyyy-mm-dd)
     type: string
@@ -40,21 +49,10 @@ variables:
 pool:
   vmImage: ubuntu-latest
 
-stages:
-  - stage: DataOperation
-    displayName: ${{ parameters.operation }} (${{ parameters.environment }})
-    jobs:
-      # A deployment job, so the environment's approvals and checks apply, including to the delete.
-      - deployment: DataOperation
-        environment: ${{ parameters.environment }}
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - template: azure-pipelines/prepare.yml
-                - template: azure-pipelines/data-operation-step.yml
-                  parameters:
-                    environment: ${{ parameters.environment }}
-                    operation: ${{ parameters.operation }}
-                    fromDay: ${{ parameters.fromDay }}
-                    expectFactRows: ${{ parameters.expectFactRows }}
+extends:
+  template: azure-pipelines/data-operations.yml@template
+  parameters:
+    environment: ${{ parameters.environment }}
+    operation: ${{ parameters.operation }}
+    fromDay: ${{ parameters.fromDay }}
+    expectFactRows: ${{ parameters.expectFactRows }}

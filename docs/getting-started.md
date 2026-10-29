@@ -54,9 +54,12 @@ Notes:
 
 ## Data operations
 
-`data-operations.yml` is a second Azure Pipelines pipeline, separate from the deploy pipeline. Register it as its own
-pipeline with the same `variables` values as `azure-pipelines.yml`. It never runs on a push or a deploy: queue it by
-hand, pick the environment and an operation. Its identity must be in the SQL server's Entra admin group. It needs a
+`data-operations.yml` is a second Azure Pipelines pipeline, separate from the deploy pipeline. It holds only your
+values and a pointer: its stages and steps are loaded at run time with `extends` from
+`azure-pipelines/data-operations.yml` in this template repository, so your deployment repository never carries a
+copy of them. Fill in the same `variables` values as `azure-pipelines.yml`, plus an Azure DevOps service connection of
+type GitHub that can read this repository (`endpoint`), then register it as its own pipeline. It never runs on a push
+or a deploy: queue it by hand, pick the environment and an operation. Its identity must be in the SQL server's Entra admin group. It needs a
 portal release that includes `scripts/data-ops.sh`.
 
 | Operation | What it does |
