@@ -20,8 +20,8 @@ Prerequisite: the pipeline agent needs outbound HTTPS access to `github.com` (se
 | --- | --- |
 | `config/deployment.yml` | Settings the pipeline reads: which portal repository and release to deploy. |
 | `config/*.tfvars` | Settings Terraform and the portal read, per environment: organization facts, region, optional modules, network mode, alert emails. |
-| `azure-pipelines.yml`, `azure-pipelines/` | Azure Pipelines wrapper: fetches the pinned portal release, then runs Terraform init, validate, plan and (after approval) apply through its deploy script, followed by the Database stage and the optional portal and functions code deploys. The root file only sets your values and loads its stages from this repository's `azure-pipelines/deploy.yml`. |
-| `data-operations.yml` | Separate Azure Pipelines pipeline for data operations on the portal database (metrics status, synthetic data removal). Never triggered; queue it by hand. It only sets your values and loads its stages from this repository's `azure-pipelines/data-operations.yml`. |
+| `azure-pipelines.yml`, `azure-pipelines/` | Azure Pipelines wrapper: fetches the pinned portal release, then runs Terraform init, validate, plan and (after approval) apply through its deploy script, followed by the Database stage and the optional portal and functions code deploys. The root file only sets your values; its stages are in `azure-pipelines/deploy.yml`. |
+| `data-operations.yml` | Separate Azure Pipelines pipeline for data operations on the portal database (metrics status, synthetic data removal). Never triggered; queue it by hand. It only sets your values; its stages are in `azure-pipelines/data-operations.yml`. |
 | `.github/workflows/deploy.yml` | The same for GitHub Actions. |
 | `docs/` | Setup guide and the deployment-note template. |
 

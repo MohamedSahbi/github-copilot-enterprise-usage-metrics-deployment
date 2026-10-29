@@ -1,6 +1,6 @@
 # Data operations on an environment's portal database: the pipeline logic, loaded with `extends` from the root
 # data-operations.yml. All work happens in the pinned portal release's scripts/data-ops.sh.
-# Deployment repositories do not copy this file; their data-operations.yml extends it from this repository.
+# Keep it identical to the template's copy; only the root data-operations.yml holds your values.
 parameters:
   - name: environment
     displayName: Environment

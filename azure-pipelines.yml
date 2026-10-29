@@ -1,20 +1,9 @@
 # Azure Pipelines wrapper. All logic lives in the portal's scripts/deploy-infra.sh; this file only prepares inputs.
 # Run it manually (no CI trigger). Settings to replace are marked REPLACE.
-# The stages and steps are loaded at run time from azure-pipelines/deploy.yml in the deployment template repository,
-# so a deployment repository keeps only this file's values and its config/, never a copy of the pipeline.
+# The stages and steps are in azure-pipelines/deploy.yml. Keep that folder an unchanged copy of the template's: copy it
+# whole on a re-sync and never edit it, so all pipeline logic comes from the template and only this file's values differ.
 trigger: none
 pr: none
-
-resources:
-  repositories:
-    - repository: template
-      type: github
-      # Azure DevOps service connection of type "GitHub" that can read the public template repository
-      # (docs/getting-started.md, "Loading the pipelines from this template"; it also covers running without one).
-      endpoint: REPLACE-github-service-connection-name
-      name: MohamedSahbi/github-copilot-enterprise-usage-metrics-deployment
-      # Follows the template's main branch. Pin a tag or commit (refs/tags/<tag>) to hold a reviewed version.
-      ref: refs/heads/main
 
 parameters:
   - name: environment
@@ -48,7 +37,7 @@ pool:
   vmImage: ubuntu-latest
 
 extends:
-  template: azure-pipelines/deploy.yml@template
+  template: azure-pipelines/deploy.yml
   parameters:
     environment: ${{ parameters.environment }}
     apply: ${{ parameters.apply }}

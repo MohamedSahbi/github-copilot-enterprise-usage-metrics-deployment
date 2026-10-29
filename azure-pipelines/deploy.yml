@@ -1,6 +1,6 @@
 # Deploy pipeline logic: Terraform plan and apply, then the Database stage and the optional portal and functions code
 # deploys, all through the pinned portal release's scripts. Loaded with `extends` from the root azure-pipelines.yml.
-# Deployment repositories do not copy this file; their azure-pipelines.yml extends it from this repository.
+# Keep it identical to the template's copy; only the root azure-pipelines.yml holds your values.
 parameters:
   - name: environment
     displayName: Environment

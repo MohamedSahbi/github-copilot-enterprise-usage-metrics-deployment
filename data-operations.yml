@@ -1,21 +1,10 @@
 # Azure Pipelines: data operations on an environment's portal database, separate from the deploy pipeline.
 # Nothing triggers it: queue it by hand and pick an operation. Register it as its own pipeline.
-# This file only points at the pipeline in the deployment template repository and sets your values; the stages, steps
-# and checks are loaded from there at run time, so a deployment repository never carries its own copy of them.
-# Settings to replace are marked REPLACE (the same values as azure-pipelines.yml, plus a GitHub service connection).
+# This file only sets your values; the stages and steps are in azure-pipelines/data-operations.yml, an unchanged copy
+# of the template's folder (copy it whole on a re-sync, never edit it).
+# Settings to replace are marked REPLACE (the same values as azure-pipelines.yml).
 trigger: none
 pr: none
-
-resources:
-  repositories:
-    - repository: template
-      type: github
-      # Azure DevOps service connection of type "GitHub" that can read the public template repository
-      # (docs/getting-started.md, "Loading the pipelines from this template"; it also covers running without one).
-      endpoint: REPLACE-github-service-connection-name
-      name: MohamedSahbi/github-copilot-enterprise-usage-metrics-deployment
-      # Follows the template's main branch. Pin a tag or commit (refs/tags/<tag>) to hold a reviewed version.
-      ref: refs/heads/main
 
 parameters:
   - name: environment
@@ -51,7 +40,7 @@ pool:
   vmImage: ubuntu-latest
 
 extends:
-  template: azure-pipelines/data-operations.yml@template
+  template: azure-pipelines/data-operations.yml
   parameters:
     environment: ${{ parameters.environment }}
     operation: ${{ parameters.operation }}
