@@ -1,0 +1,112 @@
+# Deploy pipeline logic: Terraform plan and apply, then the Database stage and the optional portal and functions code
+# deploys, all through the pinned portal release's scripts. Loaded with `extends` from the root azure-pipelines.yml.
+# Deployment repositories do not copy this file; their azure-pipelines.yml extends it from this repository.
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values: [dev, test, prod]
+  - name: apply
+    displayName: Apply the reviewed plan after approval (otherwise plan only)
+    type: boolean
+    default: false
+  - name: deployPortal
+    displayName: Deploy the portal code after the apply (needs apply)
+    type: boolean
+    default: false
+  - name: deployFunctions
+    displayName: Deploy the ingestion Function Apps code after the apply (needs apply)
+    type: boolean
+    default: false
+
+stages:
+  - stage: Plan
+    displayName: Plan ${{ parameters.environment }}
+    jobs:
+      - job: Plan
+        steps:
+          - template: prepare.yml
+          - template: terraform-step.yml
+            parameters: { step: init, environment: '${{ parameters.environment }}' }
+          - template: terraform-step.yml
+            parameters: { step: validate, environment: '${{ parameters.environment }}' }
+          - template: terraform-step.yml
+            parameters: { step: plan, environment: '${{ parameters.environment }}' }
+          # The plan file can contain sensitive values: restrict who can read this pipeline's artifacts.
+          - publish: portal/infra/terraform/stack/${{ parameters.environment }}.tfplan
+            artifact: tfplan-${{ parameters.environment }}
+            displayName: Publish the plan for review and apply
+
+  - ${{ if eq(parameters.apply, true) }}:
+      - stage: Apply
+        displayName: Apply ${{ parameters.environment }}
+        dependsOn: Plan
+        jobs:
+          # Add approvals and checks on the Azure DevOps environment (Pipelines > Environments), especially for prod.
+          - deployment: Apply
+            # Slow Azure operations (for example a SQL tier change) can exceed the 60 minute default.
+            timeoutInMinutes: 120
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: prepare.yml
+                    - bash: cp "$(Pipeline.Workspace)/tfplan-${{ parameters.environment }}/${{ parameters.environment }}.tfplan" portal/infra/terraform/stack/
+                      displayName: Place the reviewed plan
+                    - template: terraform-step.yml
+                      parameters: { step: init, environment: '${{ parameters.environment }}' }
+                    - template: terraform-step.yml
+                      parameters: { step: apply, environment: '${{ parameters.environment }}' }
+
+  - ${{ if eq(parameters.apply, true) }}:
+      - stage: Database
+        displayName: Database ${{ parameters.environment }}
+        dependsOn: Apply
+        jobs:
+          # Runs after every successful apply: migrations, then the runtime SQL users and roles. Re-running is safe.
+          - deployment: Database
+            timeoutInMinutes: 30
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: prepare.yml
+                    - template: deploy-db-step.yml
+                      parameters: { environment: '${{ parameters.environment }}' }
+
+  - ${{ if and(eq(parameters.apply, true), eq(parameters.deployPortal, true)) }}:
+      - stage: DeployPortal
+        displayName: Deploy portal ${{ parameters.environment }}
+        dependsOn: Database
+        jobs:
+          # Runs only after a successful apply; the environment's approvals and checks apply again.
+          - deployment: DeployPortal
+            timeoutInMinutes: 60
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: prepare.yml
+                    - template: deploy-portal-step.yml
+                      parameters: { environment: '${{ parameters.environment }}' }
+
+  - ${{ if and(eq(parameters.apply, true), eq(parameters.deployFunctions, true)) }}:
+      - stage: DeployFunctions
+        displayName: Deploy functions ${{ parameters.environment }}
+        dependsOn: Database
+        jobs:
+          # Runs only after a successful apply; the environment's approvals and checks apply again.
+          - deployment: DeployFunctions
+            timeoutInMinutes: 60
+            environment: ${{ parameters.environment }}
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - template: prepare.yml
+                    - template: deploy-functions-step.yml
+                      parameters: { environment: '${{ parameters.environment }}' }
