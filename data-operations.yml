@@ -10,7 +10,8 @@ resources:
   repositories:
     - repository: template
       type: github
-      # Azure DevOps service connection of type "GitHub" that can read the public template repository.
+      # Azure DevOps service connection of type "GitHub" that can read the public template repository
+      # (docs/getting-started.md, "Loading the pipelines from this template"; it also covers running without one).
       endpoint: REPLACE-github-service-connection-name
       name: MohamedSahbi/github-copilot-enterprise-usage-metrics-deployment
       # Follows the template's main branch. Pin a tag or commit (refs/tags/<tag>) to hold a reviewed version.
