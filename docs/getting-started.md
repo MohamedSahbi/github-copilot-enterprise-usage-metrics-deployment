@@ -13,7 +13,7 @@ Everything below is one-time setup per subscription. Terraform state and deploys
 
 Choose one wrapper; both call the portal's `scripts/deploy-infra.sh`.
 
-**Azure Pipelines** (`azure-pipelines.yml`): create an Azure Resource Manager service connection with **workload identity federation** and put its name, plus the state resource group and account, in the `variables` block of the file (marked REPLACE). The service connection identity needs the same role assignments as step 3. Create Azure DevOps environments named exactly `dev`, `test` and `prod` (Pipelines > Environments) before the first run, and add approvals on `prod`. Run the pipeline manually and pick the environment; leave `apply` off for a plan first.
+**Azure Pipelines** (`azure-pipelines.yml`): create an Azure Resource Manager service connection with **workload identity federation** and put its name, plus the state resource group and account, in the `variables` block of the file (marked REPLACE). The file holds only these values: its stages and steps are in `azure-pipelines/deploy.yml` (see [Keeping the pipelines in step with this template](#keeping-the-pipelines-in-step-with-this-template)). The Azure Resource Manager service connection identity needs the same role assignments as step 3. Create Azure DevOps environments named exactly `dev`, `test` and `prod` (Pipelines > Environments) before the first run, and add approvals on `prod`. Run the pipeline manually and pick the environment; leave `apply` off for a plan first.
 
 **GitHub Actions** (`.github/workflows/deploy.yml`): follow the next section.
 
@@ -53,13 +53,42 @@ Notes:
 - The apply job has a 120 minute limit. Some Azure changes are slow; switching `sql_database_sku` between provisioned and serverless after the first deploy can take a long time, so choose the SKU before the first deploy.
 - If an apply is cancelled, it leaves the Terraform state locked. Break the lease on the state blob (`az storage blob lease break`) or run `terraform force-unlock`, then plan again.
 
+## Keeping the pipelines in step with this template
+
+`azure-pipelines.yml` and `data-operations.yml` hold only your values. Their stages and steps are in the
+`azure-pipelines/` folder, which they load with `extends`. Treat that folder as the template's, not yours: keep it an
+unchanged copy, and on a re-sync copy it whole from this repository, never edit it. Then all pipeline logic comes from
+the template, and the only lines that differ in your deployment repository are the values in the two root files and
+`config/`.
+
+**Optional: load the folder straight from this repository**
+
+If your Azure DevOps project can have a service connection of type **GitHub**, you can drop the copy and load the
+templates at run time instead:
+
+1. Project settings > Service connections > New service connection > **GitHub**. Authenticate with OAuth (Grant
+   authorization) or a token with read access to public repositories only; it never needs write access. Allow both
+   pipelines to use it (Security > Pipeline permissions).
+2. In both root files, add this block and append `@template` to the `extends` path
+   (`template: azure-pipelines/deploy.yml@template`, `template: azure-pipelines/data-operations.yml@template`):
+
+   ```yaml
+   resources:
+     repositories:
+       - repository: template
+         type: github
+         endpoint: <your GitHub service connection name>
+         name: MohamedSahbi/github-copilot-enterprise-usage-metrics-deployment
+         ref: refs/heads/main   # or refs/tags/<tag> to hold a reviewed version
+   ```
+
+3. Delete your copy of `azure-pipelines/`.
+
 ## Data operations
 
 `data-operations.yml` is a second Azure Pipelines pipeline, separate from the deploy pipeline. It holds only your
-values and a pointer: its stages and steps are loaded at run time with `extends` from
-`azure-pipelines/data-operations.yml` in this template repository, so your deployment repository never carries a
-copy of them. Fill in the same `variables` values as `azure-pipelines.yml`, plus an Azure DevOps service connection of
-type GitHub that can read this repository (`endpoint`), then register it as its own pipeline. It never runs on a push
+values; its stages and steps are in `azure-pipelines/data-operations.yml`. Fill in the same `variables` values as
+`azure-pipelines.yml`, then register it as its own pipeline. It never runs on a push
 or a deploy: queue it by hand, pick the environment and an operation. Its identity must be in the SQL server's Entra admin group. It needs a
 portal release that includes `scripts/data-ops.sh`.
 
