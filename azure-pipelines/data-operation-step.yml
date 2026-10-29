@@ -1,0 +1,46 @@
+# Runs one data operation through the pinned portal release's scripts/data-ops.sh. Used by data-operations.yml.
+# The database comes from the Terraform outputs, so nothing environment-specific is configured here.
+parameters:
+  - name: environment
+    type: string
+  - name: operation
+    type: string
+  - name: fromDay
+    type: string
+  - name: expectFactRows
+    type: string
+
+steps:
+  - task: UseNode@1
+    displayName: Use Node.js 22
+    inputs:
+      version: 22.x
+
+  - task: AzureCLI@2
+    displayName: Data operation ${{ parameters.operation }} (${{ parameters.environment }})
+    inputs:
+      azureSubscription: $(azureServiceConnection)
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -euo pipefail
+        [[ -x portal/scripts/data-ops.sh ]] || {
+          echo "##vso[task.logissue type=error]portal.version predates scripts/data-ops.sh; pin a release that includes it"; exit 1
+        }
+        export ARM_USE_OIDC=true
+        export ARM_USE_AZUREAD_AUTH=true
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_OIDC_TOKEN="$idToken"
+        export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+        portal/scripts/deploy-infra.sh init "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"
+        # init may add platform hashes to the lockfile; keep the release checkout unmodified.
+        git -C portal checkout -- infra/terraform/stack/.terraform.lock.hcl
+        case "${{ parameters.operation }}" in
+          status) portal/scripts/data-ops.sh status --from "${{ parameters.fromDay }}" ;;
+          remove-synthetic) portal/scripts/data-ops.sh remove-synthetic ;;
+          remove-synthetic-execute)
+            portal/scripts/data-ops.sh remove-synthetic --execute --expect-fact-rows "${{ parameters.expectFactRows }}" ;;
+          *) echo "##vso[task.logissue type=error]Unknown operation"; exit 2 ;;
+        esac

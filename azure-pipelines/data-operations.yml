@@ -1,0 +1,44 @@
+# Data operations on an environment's portal database: the pipeline logic, loaded with `extends` from the root
+# data-operations.yml. All work happens in the pinned portal release's scripts/data-ops.sh.
+# Deployment repositories do not copy this file; their data-operations.yml extends it from this repository.
+parameters:
+  - name: environment
+    displayName: Environment
+    type: string
+    default: dev
+    values: [dev, test, prod]
+  - name: operation
+    displayName: Operation
+    type: string
+    default: status
+    values:
+      - status                    # read-only: metrics state of each day from fromDay to yesterday, synthetic run IDs
+      - remove-synthetic          # dry run: deletes in a transaction, prints the counts, rolls back
+      - remove-synthetic-execute  # deletes, only if the fact-row count still equals expectFactRows
+  - name: fromDay
+    displayName: First day for status (yyyy-mm-dd)
+    type: string
+    default: "2026-09-01"
+  - name: expectFactRows
+    displayName: Fact rows from the dry run (remove-synthetic-execute only)
+    type: string
+    default: "-"
+
+stages:
+  - stage: DataOperation
+    displayName: ${{ parameters.operation }} (${{ parameters.environment }})
+    jobs:
+      # A deployment job, so the environment's approvals and checks apply, including to the delete.
+      - deployment: DataOperation
+        environment: ${{ parameters.environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: prepare.yml
+                - template: data-operation-step.yml
+                  parameters:
+                    environment: ${{ parameters.environment }}
+                    operation: ${{ parameters.operation }}
+                    fromDay: ${{ parameters.fromDay }}
+                    expectFactRows: ${{ parameters.expectFactRows }}

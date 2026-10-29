@@ -53,6 +53,24 @@ Notes:
 - The apply job has a 120 minute limit. Some Azure changes are slow; switching `sql_database_sku` between provisioned and serverless after the first deploy can take a long time, so choose the SKU before the first deploy.
 - If an apply is cancelled, it leaves the Terraform state locked. Break the lease on the state blob (`az storage blob lease break`) or run `terraform force-unlock`, then plan again.
 
+## Data operations
+
+`data-operations.yml` is a second Azure Pipelines pipeline, separate from the deploy pipeline. It holds only your
+values and a pointer: its stages and steps are loaded at run time with `extends` from
+`azure-pipelines/data-operations.yml` in this template repository, so your deployment repository never carries a
+copy of them. Fill in the same `variables` values as `azure-pipelines.yml`, plus an Azure DevOps service connection of
+type GitHub that can read this repository (`endpoint`), then register it as its own pipeline. It never runs on a push
+or a deploy: queue it by hand, pick the environment and an operation. Its identity must be in the SQL server's Entra admin group. It needs a
+portal release that includes `scripts/data-ops.sh`.
+
+| Operation | What it does |
+| --- | --- |
+| `status` | Read-only. The metrics state of each day from `fromDay` to yesterday, per organization, and any synthetic run IDs |
+| `remove-synthetic` | Dry run. Deletes published metrics runs the loader did not write inside a transaction, prints the counts, rolls back |
+| `remove-synthetic-execute` | Deletes them, only if the fact-row count still equals `expectFactRows` from the dry run |
+
+The portal's `docs/runbooks/metrics-history-import.md` gives the order (status, dry run, delete, then `backfill_from`).
+
 ## Outbound access for the pipeline
 
 The deploy agent must reach `github.com` over HTTPS (port 443) to clone the portal release (`MohamedSahbi/github-copilot-enterprise-usage-metrics`, or your fork). If your organization uses an outbound allowlist or proxy, add `github.com`. Building the portal application (not part of this template's deploy) also fetches the upstream submodule from `github.com`; the same allowlist entry covers it.
