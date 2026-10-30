@@ -11,6 +11,25 @@ parameters:
     type: string
 
 steps:
+  # Checked before sign-in and init, so a wrong parameter fails in seconds with a clear message.
+  - bash: |
+      set -euo pipefail
+      case "$OPERATION" in
+        status)
+          [[ "$FROM_DAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+            echo "##vso[task.logissue type=error]First day for status must be yyyy-mm-dd, got '$FROM_DAY'"; exit 1
+          } ;;
+        remove-synthetic-execute)
+          [[ "$EXPECT_FACT_ROWS" =~ ^[0-9]+$ ]] || {
+            echo "##vso[task.logissue type=error]Fact rows from the dry run must be the whole number the remove-synthetic dry run printed (factRows), got '$EXPECT_FACT_ROWS'"; exit 1
+          } ;;
+      esac
+    displayName: Check parameters
+    env:
+      OPERATION: ${{ parameters.operation }}
+      FROM_DAY: ${{ parameters.fromDay }}
+      EXPECT_FACT_ROWS: ${{ parameters.expectFactRows }}
+
   - task: UseNode@1
     displayName: Use Node.js 22
     inputs:
@@ -35,8 +54,6 @@ steps:
         export ARM_OIDC_TOKEN="$idToken"
         export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
         portal/scripts/deploy-infra.sh init "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"
-        # init may add platform hashes to the lockfile; keep the release checkout unmodified.
-        git -C portal checkout -- infra/terraform/stack/.terraform.lock.hcl
         case "${{ parameters.operation }}" in
           status) portal/scripts/data-ops.sh status --from "${{ parameters.fromDay }}" ;;
           remove-synthetic) portal/scripts/data-ops.sh remove-synthetic ;;
