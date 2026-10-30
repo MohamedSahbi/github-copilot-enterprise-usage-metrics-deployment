@@ -35,8 +35,6 @@ steps:
         export ARM_OIDC_TOKEN="$idToken"
         export ARM_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
         portal/scripts/deploy-infra.sh init "${{ parameters.environment }}" "config/${{ parameters.environment }}.tfvars"
-        # init may add platform hashes to the lockfile; keep the release checkout unmodified.
-        git -C portal checkout -- infra/terraform/stack/.terraform.lock.hcl
         case "${{ parameters.operation }}" in
           status) portal/scripts/data-ops.sh status --from "${{ parameters.fromDay }}" ;;
           remove-synthetic) portal/scripts/data-ops.sh remove-synthetic ;;
